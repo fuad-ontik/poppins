@@ -1,0 +1,6 @@
+openai
+fastapi
+uvicorn[standard]
+pydantic
+streamlit
+python-dotenv
