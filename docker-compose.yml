@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-realtime-preview}
+      - OPENAI_VOICE=${OPENAI_VOICE:-alloy}
+    volumes:
+      - .:/app
+    networks:
+      - poppins-network
+
+  # Test service
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - TESTING=1
+      - OPENAI_API_KEY=test_api_key_for_testing
+      - OPENAI_MODEL=gpt-4o-realtime-preview
+      - OPENAI_VOICE=alloy
+    volumes:
+      - ./test-results:/app/test-results
+      - .:/app
+    networks:
+      - poppins-network
+    profiles:
+      - test
+
+  # Test service with watch mode
+  test-watch:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - TESTING=1
+      - OPENAI_API_KEY=test_api_key_for_testing
+      - OPENAI_MODEL=gpt-4o-realtime-preview
+      - OPENAI_VOICE=alloy
+    volumes:
+      - ./test-results:/app/test-results
+      - .:/app
+    command: ["pytest", "-v", "--tb=short", "-f", "--cov=chatbot", "--cov=main", "--cov-report=term-missing"]
+    networks:
+      - poppins-network
+    profiles:
+      - test-watch
+
+networks:
+  poppins-network:
+    driver: bridge
+
+volumes:
+  test-results:

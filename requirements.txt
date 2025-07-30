@@ -7,5 +7,11 @@ python-dotenv
 websockets
 python-multipart
 openai[realtime]
-websockets
 aiohttp
+
+# Testing dependencies
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+pytest-mock

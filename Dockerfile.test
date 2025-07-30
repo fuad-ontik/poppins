@@ -1,0 +1,30 @@
+# Dockerfile for testing
+FROM python:3.11-slim
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . .
+
+# Set environment variables for testing
+ENV PYTHONUNBUFFERED=1
+ENV TESTING=1
+ENV OPENAI_API_KEY=test_api_key_for_testing
+ENV OPENAI_MODEL=gpt-4o-realtime-preview
+ENV OPENAI_VOICE=alloy
+
+# Create test results directory
+RUN mkdir -p /app/test-results
+
+# Default command to run tests
+CMD ["pytest", "-v", "--tb=short", "--cov=chatbot", "--cov=main", "--cov-report=term-missing", "--cov-report=html:/app/test-results/htmlcov", "--junitxml=/app/test-results/junit.xml"]
