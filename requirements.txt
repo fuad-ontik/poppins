@@ -4,6 +4,8 @@ uvicorn[standard]
 pydantic
 streamlit
 python-dotenv
+websockets
+python-multipart
 openai[realtime]
 websockets
 aiohttp

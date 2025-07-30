@@ -70,13 +70,16 @@ class RealtimeChatbot:
                 "instructions": (
                     "You are Poppins, a supportive, empathetic assistant for parents. "
                     "Always respond in English and provide calm, emotionally supportive responses. "
-                    "Help parents with their concerns in a caring and understanding manner."
+                    "Help parents with their concerns in a caring and understanding manner. "
+                    "When audio output is requested, always provide both text and audio responses."
                 ),
                 "voice": self.voice,
                 "input_audio_format": self.audio_format,
                 "output_audio_format": self.audio_format,
                 "input_audio_transcription": {"model": "whisper-1"}
             }
+            
+            print(f"🔧 Session config: {session_config}")  # Debug session configuration
             
             await self.connection.session.update(session=session_config)
             self.is_connected = True
@@ -100,7 +103,7 @@ class RealtimeChatbot:
                 self.connection = None
                 self.connection_manager = None
                 
-    async def send_text_message(self, text: str):
+    async def send_text_message(self, text: str, include_audio: bool = False):
         """Send a text message to the assistant"""
         if not self.is_connected:
             raise RuntimeError("Not connected. Call connect() first.")
@@ -124,8 +127,16 @@ class RealtimeChatbot:
         # Send to API
         await self.connection.conversation.item.create(item=item)
         
+        # Configure response based on modalities
+        response_config = {}
+        if include_audio:
+            response_config["modalities"] = ["text", "audio"]
+            print(f"🔧 Creating response with modalities: {response_config['modalities']}")
+        else:
+            print("🔧 Creating text-only response")
+        
         # Trigger response
-        await self.connection.response.create()
+        await self.connection.response.create(response=response_config if response_config else None)
         
     async def send_audio_message(self, audio_data: bytes):
         """Send audio message (PCM16 format)"""
@@ -148,8 +159,8 @@ class RealtimeChatbot:
         # Send to API
         await self.connection.conversation.item.create(item=item)
         
-        # Trigger response
-        await self.connection.response.create()
+        # Trigger response with audio output
+        await self.connection.response.create(response={"modalities": ["text", "audio"]})
         
     async def listen_for_responses(self):
         """Listen for and handle streaming responses"""
@@ -179,26 +190,42 @@ class RealtimeChatbot:
     async def _handle_event(self, event):
         """Handle individual events from the API"""
         
+        # Debug: Log all event types
+        print(f"🔍 Event received: {event.type}")
+        
         # Text streaming events
         if event.type == "response.text.delta":
             chunk = event.delta
             self.current_text_response += chunk
+            print(f"📝 Text delta: '{chunk}'")  # Debug text chunks
             if self.text_handler:
                 self.text_handler(chunk)
                 
         elif event.type == "response.text.done":
-            pass  # Text accumulation complete
+            print(f"📝 Text complete. Total: '{self.current_text_response}'")  # Debug text completion
+            
+        # Audio transcript events (these contain the text when audio is generated)
+        elif event.type == "response.audio_transcript.delta":
+            chunk = event.delta
+            self.current_text_response += chunk
+            print(f"📝 Audio transcript delta: '{chunk}'")  # Debug transcript chunks
+            if self.text_handler:
+                self.text_handler(chunk)
+                
+        elif event.type == "response.audio_transcript.done":
+            print(f"📝 Audio transcript complete. Total: '{self.current_text_response}'")  # Debug transcript completion
             
         # Audio streaming events
         elif event.type == "response.audio.delta":
             # Decode base64 audio chunk
             audio_chunk = base64.b64decode(event.delta)
             self.current_audio_response += audio_chunk
+            print(f"🔊 Audio delta: {len(audio_chunk)} bytes")  # Debug audio chunks
             if self.audio_handler:
                 self.audio_handler(audio_chunk)
                 
         elif event.type == "response.audio.done":
-            pass  # Audio accumulation complete
+            print(f"🔊 Audio complete. Total: {len(self.current_audio_response)} bytes")  # Debug audio completion
             
         # Input audio transcription
         elif event.type == "conversation.item.input_audio_transcription.completed":
@@ -208,6 +235,10 @@ class RealtimeChatbot:
         # Error handling
         elif event.type == "error":
             print(f"❌ API Error: {event.error}")
+            
+        # Debug: Log any other event types we might be missing
+        elif hasattr(event, 'type'):
+            print(f"🔍 Unhandled event type: {event.type}")
             
     def _save_response_to_history(self):
         """Save the complete response to conversation history"""
